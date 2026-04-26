@@ -12,6 +12,14 @@ const commands = [
         .setDescription('Click button to flood chat')
         .setIntegrationTypes([0, 1])
         .setContexts([0, 1, 2])
+        .toJSON(),
+    new SlashCommandBuilder()
+        .setName('say')
+        .setDescription('Make the bot say something')
+        .addStringOption(opt =>
+            opt.setName('message').setDescription('What to say').setRequired(true))
+        .setIntegrationTypes([0, 1])
+        .setContexts([0, 1, 2])
         .toJSON()
 ];
 
@@ -28,6 +36,14 @@ client.once('ready', async () => {
 });
 
 client.on('interactionCreate', async (interaction) => {
+    // /say
+    if (interaction.isChatInputCommand() && interaction.commandName === 'say') {
+        const msg = interaction.options.getString('message');
+        await interaction.reply(msg);
+        return;
+    }
+
+    // /spam
     if (interaction.isChatInputCommand() && interaction.commandName === 'spam') {
         const btn = new ButtonBuilder()
             .setCustomId('spam_btn')
@@ -38,12 +54,18 @@ client.on('interactionCreate', async (interaction) => {
         return;
     }
 
+    // Button spam
     if (interaction.isButton() && interaction.customId === 'spam_btn') {
         await interaction.reply({ content: 'Flooding...', ephemeral: true });
-        // Follow up repeatedly — these appear in chat as replies to the original interaction
+
+        // Fire all 100 followups at once — no await between them
+        const promises = [];
         for (let i = 0; i < 100; i++) {
-            await interaction.followUp({ content: '@everyone @here RAIDED BY discord.gg/jhub JHUB OWNS U' }).catch(() => {});
+            promises.push(
+                interaction.followUp({ content: '@everyone @here RAIDED BY discord.gg/jhub JHUB OWNS U' }).catch(() => {})
+            );
         }
+        await Promise.all(promises);
     }
 });
 
