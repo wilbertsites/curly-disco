@@ -1,14 +1,13 @@
 const { Client, REST, Routes, SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const http = require('http');
 
-const client = new Client({ intents: [1, 512, 32768] });
+const client = new Client({ intents: [1, 2, 512, 32768] });
 
 const TOKEN = process.env.TOKEN;
 const CLIENT_ID = "1489612859179798588";
 const WHITELIST_ROLE_ID = "1498099673406374029";
 const JHUB_URL = "https://discord.gg/jhub";
 
-// Zalgo chars
 const ZALGO_UP = ['\u030D','\u030E','\u0304','\u0305','\u033F','\u0311','\u0306','\u0310','\u0352','\u0357','\u0351','\u0307','\u0308','\u030A','\u0342','\u0343','\u0344','\u034A','\u034B','\u034C','\u0303','\u0302','\u030C','\u0350','\u0300','\u0301','\u030B','\u030F','\u0312','\u0313','\u0314','\u033D','\u0309','\u0363','\u0364','\u0365','\u0366','\u0367','\u0368','\u0369','\u036A','\u036B','\u036C','\u036D','\u036E','\u036F','\u033E','\u035B','\u0346','\u031A'];
 const ZALGO_MID = ['\u0315','\u031B','\u0340','\u0341','\u0358','\u0321','\u0322','\u0327','\u0328','\u0334','\u0335','\u0336','\u034F','\u035C','\u035D','\u035E','\u035F','\u0360','\u0362','\u0338','\u0337','\u0361','\u0489'];
 const ZALGO_DOWN = ['\u0316','\u0317','\u0318','\u0319','\u031C','\u031D','\u031E','\u031F','\u0320','\u0324','\u0325','\u0326','\u0329','\u032A','\u032B','\u032C','\u032D','\u032E','\u032F','\u0330','\u0331','\u0332','\u0333','\u0339','\u033A','\u033B','\u033C','\u0345','\u0347','\u0348','\u0349','\u034D','\u034E','\u0353','\u0354','\u0355','\u0356','\u0359','\u035A','\u0323'];
@@ -42,7 +41,7 @@ const ARABIC_SPAM = '﷽'.repeat(1950);
 const ARABIC_MSG = `[JHUB](${JHUB_URL})\n${ARABIC_SPAM}\n@everyone @here`;
 
 const commands = [
-    new SlashCommandBuilder().setName('spam').setDescription('Arabic flood (premium)').setIntegrationTypes([0,1]).setContexts([0,1,2]).toJSON(),
+    new SlashCommandBuilder().setName('spam').setDescription('Arabic flood (free)').setIntegrationTypes([0,1]).setContexts([0,1,2]).toJSON(),
     new SlashCommandBuilder().setName('say').setDescription('Make bot say something (free)').addStringOption(o=>o.setName('message').setDescription('What to say').setRequired(true)).setIntegrationTypes([0,1]).setContexts([0,1,2]).toJSON(),
     new SlashCommandBuilder().setName('blame').setDescription('Frame someone (free)').addUserOption(o=>o.setName('user').setDescription('Who to blame').setRequired(true)).setIntegrationTypes([0,1]).setContexts([0,1,2]).toJSON(),
     new SlashCommandBuilder().setName('flood').setDescription('JHUB flood (premium)').setIntegrationTypes([0,1]).setContexts([0,1,2]).toJSON(),
@@ -69,11 +68,15 @@ client.once('ready', async () => {
 async function checkPremium(interaction) {
     const guildId = interaction.guildId;
     if (!guildId) {
-        await interaction.reply({content:'Join discord.gg/jhub first to use premium commands', ephemeral:true});
+        await interaction.reply({content:'Join discord.gg/jhub first', ephemeral:true});
         return false;
     }
     try {
-        const guild = await client.guilds.fetch(guildId);
+        const guild = client.guilds.cache.get(guildId);
+        if (!guild) {
+            await interaction.reply({content:'Bot not in server. Join discord.gg/jhub', ephemeral:true});
+            return false;
+        }
         const member = await guild.members.fetch(interaction.user.id);
         if (!member) {
             await interaction.reply({content:'Join discord.gg/jhub first', ephemeral:true});
@@ -85,14 +88,13 @@ async function checkPremium(interaction) {
         }
         return true;
     } catch(e) {
-        await interaction.reply({content:'Join discord.gg/jhub first', ephemeral:true});
+        await interaction.reply({content:'Error. Join discord.gg/jhub', ephemeral:true});
         return false;
     }
 }
 
 client.on('interactionCreate', async (interaction) => {
     if (!interaction.isChatInputCommand()) return;
-
     const cmd = interaction.commandName;
 
     // FREE COMMANDS
@@ -109,10 +111,6 @@ client.on('interactionCreate', async (interaction) => {
         return;
     }
 
-    // PREMIUM CHECK
-    const premium = await checkPremium(interaction);
-    if (!premium) return;
-
     if (cmd === 'spam') {
         await interaction.reply({content:'Flooding...', ephemeral:true});
         if (blamedUser) {
@@ -128,6 +126,10 @@ client.on('interactionCreate', async (interaction) => {
         }
         return;
     }
+
+    // PREMIUM CHECK FOR REST
+    const premium = await checkPremium(interaction);
+    if (!premium) return;
 
     if (cmd === 'flood') {
         await interaction.reply({content:'Flooding...', ephemeral:true});
