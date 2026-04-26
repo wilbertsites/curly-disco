@@ -10,18 +10,22 @@ const commands = [
     new SlashCommandBuilder()
         .setName('raid')
         .setDescription('Spam the channel with JHUB')
+        .setIntegrationTypes([0, 1])
+        .setContexts([0, 1, 2])
         .toJSON(),
     new SlashCommandBuilder()
         .setName('say')
         .setDescription('Make the bot say something')
         .addStringOption(opt =>
-            opt.setName('message')
-                .setDescription('What to say')
-                .setRequired(true))
+            opt.setName('message').setDescription('What to say').setRequired(true))
+        .setIntegrationTypes([0, 1])
+        .setContexts([0, 1, 2])
         .toJSON(),
     new SlashCommandBuilder()
         .setName('flood')
         .setDescription('Spam discord.gg/jhub')
+        .setIntegrationTypes([0, 1])
+        .setContexts([0, 1, 2])
         .toJSON()
 ];
 
@@ -49,14 +53,14 @@ client.on('interactionCreate', async (interaction) => {
     if (interaction.commandName === 'raid') {
         await interaction.reply({ content: 'Spamming...', ephemeral: true });
         for (let i = 0; i < 100; i++) {
-            interaction.channel.send('@everyone @here RAIDED BY discord.gg/jhub JHUB OWNS U').catch(() => {});
+            await interaction.channel.send('@everyone @here RAIDED BY discord.gg/jhub JHUB OWNS U').catch(() => {});
         }
     }
 
     if (interaction.commandName === 'flood') {
         await interaction.reply({ content: 'Flooding...', ephemeral: true });
         for (let i = 0; i < 100; i++) {
-            interaction.channel.send('discord.gg/jhub').catch(() => {});
+            await interaction.channel.send('discord.gg/jhub').catch(() => {});
         }
     }
 });
