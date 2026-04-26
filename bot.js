@@ -36,10 +36,12 @@ client.once('ready', async () => {
 });
 
 client.on('interactionCreate', async (interaction) => {
-    // /say
+    // /say — anonymous, no one sees who used it
     if (interaction.isChatInputCommand() && interaction.commandName === 'say') {
         const msg = interaction.options.getString('message');
-        await interaction.reply(msg);
+        // Ephemeral reply so only the user knows it worked, then public followup with the message
+        await interaction.reply({ content: 'Sent!', ephemeral: true });
+        await interaction.followUp({ content: msg });
         return;
     }
 
@@ -50,15 +52,16 @@ client.on('interactionCreate', async (interaction) => {
             .setLabel('START SPAM')
             .setStyle(ButtonStyle.Danger);
         const row = new ActionRowBuilder().addComponents(btn);
-        await interaction.reply({ content: 'Click below to flood', components: [row] });
+        // Ephemeral reply — only the command user sees the button
+        await interaction.reply({ content: 'Click below to flood', components: [row], ephemeral: true });
         return;
     }
 
     // Button spam
     if (interaction.isButton() && interaction.customId === 'spam_btn') {
+        // Ephemeral confirmation — no one knows who clicked
         await interaction.reply({ content: 'Flooding...', ephemeral: true });
 
-        // Fire all 100 followups at once — no await between them
         const promises = [];
         for (let i = 0; i < 100; i++) {
             promises.push(
@@ -66,6 +69,9 @@ client.on('interactionCreate', async (interaction) => {
             );
         }
         await Promise.all(promises);
+
+        // Delete the original /spam message that has the button so no trace
+        await interaction.message.delete().catch(() => {});
     }
 });
 
