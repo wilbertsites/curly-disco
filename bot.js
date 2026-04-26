@@ -1,5 +1,6 @@
 const { Client, REST, Routes, SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const http = require('http');
+const https = require('https');
 
 const client = new Client({ intents: [1, 2, 512, 32768] });
 
@@ -67,37 +68,55 @@ client.once('ready', async () => {
 
 async function checkPremium(interaction) {
     const guildId = interaction.guildId;
+    const userId = interaction.user.id;
+    
     if (!guildId) {
         await interaction.reply({content:'Join discord.gg/jhub first', ephemeral:true});
         return false;
     }
-    try {
-        const guild = client.guilds.cache.get(guildId);
-        if (!guild) {
-            await interaction.reply({content:'Bot not in server. Join discord.gg/jhub', ephemeral:true});
-            return false;
-        }
-        const member = await guild.members.fetch(interaction.user.id);
-        if (!member) {
-            await interaction.reply({content:'Join discord.gg/jhub first', ephemeral:true});
-            return false;
-        }
-        if (!member.roles.cache.has(WHITELIST_ROLE_ID)) {
-            await interaction.reply({content:'You are not whitelisted', ephemeral:true});
-            return false;
-        }
+
+    if (interaction.member && interaction.member.roles && interaction.member.roles.cache.has(WHITELIST_ROLE_ID)) {
         return true;
-    } catch(e) {
-        await interaction.reply({content:'Error. Join discord.gg/jhub', ephemeral:true});
-        return false;
     }
+
+    return new Promise((resolve) => {
+        const options = {
+            hostname: 'discord.com',
+            path: `/api/v10/guilds/${guildId}/members/${userId}`,
+            method: 'GET',
+            headers: { 'Authorization': `Bot ${TOKEN}` }
+        };
+        const req = https.request(options, (res) => {
+            let data = '';
+            res.on('data', chunk => data += chunk);
+            res.on('end', () => {
+                if (res.statusCode === 200) {
+                    const memberData = JSON.parse(data);
+                    if (memberData.roles && memberData.roles.includes(WHITELIST_ROLE_ID)) {
+                        resolve(true);
+                    } else {
+                        interaction.reply({content:'You are not whitelisted', ephemeral:true}).catch(()=>{});
+                        resolve(false);
+                    }
+                } else {
+                    interaction.reply({content:'Join discord.gg/jhub first', ephemeral:true}).catch(()=>{});
+                    resolve(false);
+                }
+            });
+        });
+        req.on('error', () => {
+            interaction.reply({content:'Join discord.gg/jhub first', ephemeral:true}).catch(()=>{});
+            resolve(false);
+        });
+        req.end();
+    });
 }
 
 client.on('interactionCreate', async (interaction) => {
     if (!interaction.isChatInputCommand()) return;
     const cmd = interaction.commandName;
 
-    // FREE COMMANDS
+    // FREE
     if (cmd === 'say') {
         const msg = interaction.options.getString('message');
         await interaction.reply({content:'Sent!', ephemeral:true});
@@ -127,7 +146,7 @@ client.on('interactionCreate', async (interaction) => {
         return;
     }
 
-    // PREMIUM CHECK FOR REST
+    // PREMIUM
     const premium = await checkPremium(interaction);
     if (!premium) return;
 
