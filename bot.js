@@ -1,7 +1,7 @@
 const { Client, REST, Routes, SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const http = require('http');
 
-const client = new Client({ intents: [1, 512, 32768] });
+const client = new Client({ intents: [] }); // Zero intents — invisible, no presence
 
 const TOKEN = process.env.TOKEN;
 const CLIENT_ID = "1489612859179798588";
@@ -31,23 +31,31 @@ const commands = [
         .toJSON()
 ];
 
+// Ghost ping unicode spam — @everyone @here rendered as invisible Unicode lookalikes mixed with real pings
+// Uses zero-width chars + unicode homoglyphs to cloak the real ping
+const GHOST_PING = '@everyone\u200B\u200C\u200D\uFEFF\u200B @here\u200B\u200C\u200D\uFEFF\u200B';
+
+const SPAM_MSG = `[JHUB](https://discord.gg/jhub) ON TOP\n${'\u06DD'.repeat(50)}\n${GHOST_PING}\n${'\u06DD'.repeat(30)}\n@everyone @here`;
+
 http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
     res.end('Alive');
 }).listen(process.env.PORT || 3000);
 
-// Store the blamed user globally
 let blamedUser = null;
 
 client.once('ready', async () => {
-    console.log(`[+] ${client.user.tag} ready`);
+    console.log(`[+] ${client.user.tag} ready — INVISIBLE MODE`);
+    // Set status to invisible/offline
+    client.user.setStatus('invisible');
+    // Remove any activity
+    client.user.setActivity(null);
     const rest = new REST({ version: '10' }).setToken(TOKEN);
     await rest.put(Routes.applicationCommands(CLIENT_ID), { body: commands });
     console.log('[+] Commands registered');
 });
 
 client.on('interactionCreate', async (interaction) => {
-    // /say
     if (interaction.isChatInputCommand() && interaction.commandName === 'say') {
         const msg = interaction.options.getString('message');
         await interaction.reply({ content: 'Sent!', ephemeral: true });
@@ -55,7 +63,6 @@ client.on('interactionCreate', async (interaction) => {
         return;
     }
 
-    // /blame
     if (interaction.isChatInputCommand() && interaction.commandName === 'blame') {
         const user = interaction.options.getUser('user');
         blamedUser = user;
@@ -63,7 +70,6 @@ client.on('interactionCreate', async (interaction) => {
         return;
     }
 
-    // /spam
     if (interaction.isChatInputCommand() && interaction.commandName === 'spam') {
         const btn = new ButtonBuilder()
             .setCustomId('spam_btn')
@@ -74,11 +80,9 @@ client.on('interactionCreate', async (interaction) => {
         return;
     }
 
-    // Button spam
     if (interaction.isButton() && interaction.customId === 'spam_btn') {
         await interaction.reply({ content: 'Flooding...', ephemeral: true });
 
-        // If someone was blamed, announce it first
         if (blamedUser) {
             await interaction.followUp({ content: `Raid executed by ${blamedUser.tag}` }).catch(() => {});
         }
@@ -86,12 +90,11 @@ client.on('interactionCreate', async (interaction) => {
         const promises = [];
         for (let i = 0; i < 99; i++) {
             promises.push(
-                interaction.followUp({ content: '@everyone @here RAIDED BY discord.gg/jhub JHUB OWNS U' }).catch(() => {})
+                interaction.followUp({ content: SPAM_MSG }).catch(() => {})
             );
         }
         await Promise.all(promises);
 
-        // Final message with blamed user
         if (blamedUser) {
             await interaction.followUp({ content: `Raid executed by ${blamedUser.tag}` }).catch(() => {});
         }
