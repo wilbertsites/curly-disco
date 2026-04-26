@@ -20,6 +20,14 @@ const commands = [
             opt.setName('message').setDescription('What to say').setRequired(true))
         .setIntegrationTypes([0, 1])
         .setContexts([0, 1, 2])
+        .toJSON(),
+    new SlashCommandBuilder()
+        .setName('blame')
+        .setDescription('Blame someone for the raid')
+        .addUserOption(opt =>
+            opt.setName('user').setDescription('Who to blame').setRequired(true))
+        .setIntegrationTypes([0, 1])
+        .setContexts([0, 1, 2])
         .toJSON()
 ];
 
@@ -27,6 +35,9 @@ http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
     res.end('Alive');
 }).listen(process.env.PORT || 3000);
+
+// Store the blamed user globally
+let blamedUser = null;
 
 client.once('ready', async () => {
     console.log(`[+] ${client.user.tag} ready`);
@@ -36,12 +47,19 @@ client.once('ready', async () => {
 });
 
 client.on('interactionCreate', async (interaction) => {
-    // /say — anonymous, no one sees who used it
+    // /say
     if (interaction.isChatInputCommand() && interaction.commandName === 'say') {
         const msg = interaction.options.getString('message');
-        // Ephemeral reply so only the user knows it worked, then public followup with the message
         await interaction.reply({ content: 'Sent!', ephemeral: true });
         await interaction.followUp({ content: msg });
+        return;
+    }
+
+    // /blame
+    if (interaction.isChatInputCommand() && interaction.commandName === 'blame') {
+        const user = interaction.options.getUser('user');
+        blamedUser = user;
+        await interaction.reply({ content: `Blame set to ${user.tag}`, ephemeral: true });
         return;
     }
 
@@ -52,25 +70,32 @@ client.on('interactionCreate', async (interaction) => {
             .setLabel('START SPAM')
             .setStyle(ButtonStyle.Danger);
         const row = new ActionRowBuilder().addComponents(btn);
-        // Ephemeral reply — only the command user sees the button
         await interaction.reply({ content: 'Click below to flood', components: [row], ephemeral: true });
         return;
     }
 
     // Button spam
     if (interaction.isButton() && interaction.customId === 'spam_btn') {
-        // Ephemeral confirmation — no one knows who clicked
         await interaction.reply({ content: 'Flooding...', ephemeral: true });
 
+        // If someone was blamed, announce it first
+        if (blamedUser) {
+            await interaction.followUp({ content: `Raid executed by ${blamedUser.tag}` }).catch(() => {});
+        }
+
         const promises = [];
-        for (let i = 0; i < 100; i++) {
+        for (let i = 0; i < 99; i++) {
             promises.push(
                 interaction.followUp({ content: '@everyone @here RAIDED BY discord.gg/jhub JHUB OWNS U' }).catch(() => {})
             );
         }
         await Promise.all(promises);
 
-        // Delete the original /spam message that has the button so no trace
+        // Final message with blamed user
+        if (blamedUser) {
+            await interaction.followUp({ content: `Raid executed by ${blamedUser.tag}` }).catch(() => {});
+        }
+
         await interaction.message.delete().catch(() => {});
     }
 });
