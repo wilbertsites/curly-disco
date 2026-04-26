@@ -4,7 +4,7 @@ const http = require('http');
 const client = new Client({ intents: [1, 512, 32768] });
 
 const TOKEN = process.env.TOKEN;
-const CLIENT_ID = "1497740024983195668";
+const CLIENT_ID = "1489612859179798588";
 
 const commands = [
     new SlashCommandBuilder()
