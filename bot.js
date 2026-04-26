@@ -1,4 +1,4 @@
-const { Client, REST, Routes, SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
+const { Client, REST, Routes, SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const http = require('http');
 
 const client = new Client({ intents: [1, 512, 32768] });
@@ -44,7 +44,7 @@ const ARABIC_MSG = `[JHUB](${JHUB_URL})\n${ARABIC_SPAM}\n@everyone @here`;
 const commands = [
     new SlashCommandBuilder().setName('spam').setDescription('Arabic flood (premium)').setIntegrationTypes([0,1]).setContexts([0,1,2]).toJSON(),
     new SlashCommandBuilder().setName('say').setDescription('Make bot say something (free)').addStringOption(o=>o.setName('message').setDescription('What to say').setRequired(true)).setIntegrationTypes([0,1]).setContexts([0,1,2]).toJSON(),
-    new SlashCommandBuilder().setName('blame').setDescription('Frame someone (premium)').addUserOption(o=>o.setName('user').setDescription('Who to blame').setRequired(true)).setIntegrationTypes([0,1]).setContexts([0,1,2]).toJSON(),
+    new SlashCommandBuilder().setName('blame').setDescription('Frame someone (free)').addUserOption(o=>o.setName('user').setDescription('Who to blame').setRequired(true)).setIntegrationTypes([0,1]).setContexts([0,1,2]).toJSON(),
     new SlashCommandBuilder().setName('flood').setDescription('JHUB flood (premium)').setIntegrationTypes([0,1]).setContexts([0,1,2]).toJSON(),
     new SlashCommandBuilder().setName('custom-spam').setDescription('Spam anything (premium)').addStringOption(o=>o.setName('text').setDescription('What to spam').setRequired(true)).setIntegrationTypes([0,1]).setContexts([0,1,2]).toJSON(),
     new SlashCommandBuilder().setName('l-spam').setDescription('Zalgo lag spam (premium)').setIntegrationTypes([0,1]).setContexts([0,1,2]).toJSON()
@@ -69,7 +69,6 @@ client.once('ready', async () => {
 async function checkPremium(interaction) {
     const guildId = interaction.guildId;
     if (!guildId) {
-        // DM — can't check roles
         await interaction.reply({content:'Join discord.gg/jhub first to use premium commands', ephemeral:true});
         return false;
     }
@@ -96,7 +95,7 @@ client.on('interactionCreate', async (interaction) => {
 
     const cmd = interaction.commandName;
 
-    // Free commands
+    // FREE COMMANDS
     if (cmd === 'say') {
         const msg = interaction.options.getString('message');
         await interaction.reply({content:'Sent!', ephemeral:true});
@@ -104,7 +103,13 @@ client.on('interactionCreate', async (interaction) => {
         return;
     }
 
-    // Premium check for everything below
+    if (cmd === 'blame') {
+        blamedUser = interaction.options.getUser('user');
+        await interaction.reply({content:`Blame set to ${blamedUser.tag}`, ephemeral:true});
+        return;
+    }
+
+    // PREMIUM CHECK
     const premium = await checkPremium(interaction);
     if (!premium) return;
 
@@ -146,12 +151,6 @@ client.on('interactionCreate', async (interaction) => {
         const p = [];
         for (let i=0;i<100;i++) p.push(interaction.followUp({content:buildZalgoSpam()}).catch(()=>{}));
         await Promise.all(p);
-        return;
-    }
-
-    if (cmd === 'blame') {
-        blamedUser = interaction.options.getUser('user');
-        await interaction.reply({content:`Blame set to ${blamedUser.tag}`, ephemeral:true});
         return;
     }
 });
