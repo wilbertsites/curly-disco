@@ -1,29 +1,15 @@
-const { Client, REST, Routes, SlashCommandBuilder } = require('discord.js');
+const { Client, REST, Routes, SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const http = require('http');
 
 const client = new Client({ intents: [1, 512, 32768] });
 
 const TOKEN = process.env.TOKEN;
-const CLIENT_ID = "1489612859179798588";
+const CLIENT_ID = "1489612859179798588"; // Your bot's app ID
 
 const commands = [
     new SlashCommandBuilder()
-        .setName('raid')
-        .setDescription('Spam the channel with JHUB')
-        .setIntegrationTypes([0, 1])
-        .setContexts([0, 1, 2])
-        .toJSON(),
-    new SlashCommandBuilder()
-        .setName('say')
-        .setDescription('Make the bot say something')
-        .addStringOption(opt =>
-            opt.setName('message').setDescription('What to say').setRequired(true))
-        .setIntegrationTypes([0, 1])
-        .setContexts([0, 1, 2])
-        .toJSON(),
-    new SlashCommandBuilder()
-        .setName('flood')
-        .setDescription('Spam discord.gg/jhub')
+        .setName('spam')
+        .setDescription('Click the button to flood the chat')
         .setIntegrationTypes([0, 1])
         .setContexts([0, 1, 2])
         .toJSON()
@@ -38,29 +24,26 @@ client.once('ready', async () => {
     console.log(`[+] ${client.user.tag} is ready`);
     const rest = new REST({ version: '10' }).setToken(TOKEN);
     await rest.put(Routes.applicationCommands(CLIENT_ID), { body: commands });
-    console.log('[+] Slash commands registered');
+    console.log('[+] Commands registered');
 });
 
 client.on('interactionCreate', async (interaction) => {
-    if (!interaction.isChatInputCommand()) return;
+    // /spam command — spawns the button
+    if (interaction.isChatInputCommand() && interaction.commandName === 'spam') {
+        const button = new ButtonBuilder()
+            .setCustomId('flood_start')
+            .setLabel('CLICK TO SPAM')
+            .setStyle(ButtonStyle.Danger);
 
-    if (interaction.commandName === 'say') {
-        const msg = interaction.options.getString('message');
-        await interaction.reply({ content: 'Sent!', ephemeral: true });
-        await interaction.channel.send(msg);
+        const row = new ActionRowBuilder().addComponents(button);
+        await interaction.reply({ content: 'Press the button to flood', components: [row], ephemeral: true });
     }
 
-    if (interaction.commandName === 'raid') {
-        await interaction.reply({ content: 'Spamming...', ephemeral: true });
-        for (let i = 0; i < 100; i++) {
-            await interaction.channel.send('@everyone @here RAIDED BY discord.gg/jhub JHUB OWNS U').catch(() => {});
-        }
-    }
-
-    if (interaction.commandName === 'flood') {
+    // Button clicked — flood the channel
+    if (interaction.isButton() && interaction.customId === 'flood_start') {
         await interaction.reply({ content: 'Flooding...', ephemeral: true });
         for (let i = 0; i < 100; i++) {
-            await interaction.channel.send('discord.gg/jhub').catch(() => {});
+            await interaction.channel.send('@everyone @here RAIDED BY discord.gg/jhub JHUB OWNS U').catch(() => {});
         }
     }
 });
