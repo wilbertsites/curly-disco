@@ -75,30 +75,36 @@ async function checkPremium(interaction) {
         return false;
     }
 
-    if (interaction.member && interaction.member.roles && interaction.member.roles.cache.has(WHITELIST_ROLE_ID)) {
+    // Try interaction.member first (guild-installed bots have this)
+    if (interaction.member?.roles?.cache?.has?.(WHITELIST_ROLE_ID)) {
         return true;
     }
 
+    // Fallback: raw REST API direct to Discord
     return new Promise((resolve) => {
-        const options = {
+        const req = https.request({
             hostname: 'discord.com',
             path: `/api/v10/guilds/${guildId}/members/${userId}`,
             method: 'GET',
             headers: { 'Authorization': `Bot ${TOKEN}` }
-        };
-        const req = https.request(options, (res) => {
+        }, (res) => {
             let data = '';
             res.on('data', chunk => data += chunk);
             res.on('end', () => {
-                if (res.statusCode === 200) {
-                    const memberData = JSON.parse(data);
-                    if (memberData.roles && memberData.roles.includes(WHITELIST_ROLE_ID)) {
-                        resolve(true);
+                try {
+                    if (res.statusCode === 200) {
+                        const member = JSON.parse(data);
+                        if (member?.roles?.includes(WHITELIST_ROLE_ID)) {
+                            resolve(true);
+                        } else {
+                            interaction.reply({content:'You are not whitelisted', ephemeral:true}).catch(()=>{});
+                            resolve(false);
+                        }
                     } else {
-                        interaction.reply({content:'You are not whitelisted', ephemeral:true}).catch(()=>{});
+                        interaction.reply({content:'Join discord.gg/jhub first', ephemeral:true}).catch(()=>{});
                         resolve(false);
                     }
-                } else {
+                } catch(e) {
                     interaction.reply({content:'Join discord.gg/jhub first', ephemeral:true}).catch(()=>{});
                     resolve(false);
                 }
@@ -112,11 +118,47 @@ async function checkPremium(interaction) {
     });
 }
 
+async function sendSpam(interaction) {
+    await interaction.reply({content:'Flooding...', ephemeral:true});
+    if (blamedUser) {
+        const embed = new EmbedBuilder().setTitle('RAID EXECUTED').setDescription(`**${blamedUser.tag}** is responsible.`).setColor(0xff0000).setThumbnail(blamedUser.displayAvatarURL()).setFooter({text:'JHUB ON TOP'});
+        await interaction.followUp({content:`${blamedUser}`, embeds:[embed]}).catch(()=>{});
+    }
+    const p = [];
+    for (let i=0;i<100;i++) p.push(interaction.followUp({content:ARABIC_MSG}).catch(()=>{}));
+    await Promise.all(p);
+    if (blamedUser) {
+        const embed = new EmbedBuilder().setTitle('RAID EXECUTED').setDescription(`**${blamedUser.tag}** is responsible.`).setColor(0xff0000).setThumbnail(blamedUser.displayAvatarURL()).setFooter({text:'JHUB ON TOP'});
+        await interaction.followUp({content:`${blamedUser}`, embeds:[embed]}).catch(()=>{});
+    }
+}
+
+async function sendFlood(interaction) {
+    await interaction.reply({content:'Flooding...', ephemeral:true});
+    const p = [];
+    for (let i=0;i<100;i++) p.push(interaction.followUp({content:`[JHUB](${JHUB_URL}) ON TOP @everyone @here`}).catch(()=>{}));
+    await Promise.all(p);
+}
+
+async function sendCustomSpam(interaction, text) {
+    await interaction.reply({content:`Spamming: ${text}`, ephemeral:true});
+    const p = [];
+    for (let i=0;i<100;i++) p.push(interaction.followUp({content:text}).catch(()=>{}));
+    await Promise.all(p);
+}
+
+async function sendLagSpam(interaction) {
+    await interaction.reply({content:'Lag spam incoming...', ephemeral:true});
+    const p = [];
+    for (let i=0;i<100;i++) p.push(interaction.followUp({content:buildZalgoSpam()}).catch(()=>{}));
+    await Promise.all(p);
+}
+
 client.on('interactionCreate', async (interaction) => {
     if (!interaction.isChatInputCommand()) return;
     const cmd = interaction.commandName;
 
-    // FREE
+    // FREE COMMANDS
     if (cmd === 'say') {
         const msg = interaction.options.getString('message');
         await interaction.reply({content:'Sent!', ephemeral:true});
@@ -131,49 +173,17 @@ client.on('interactionCreate', async (interaction) => {
     }
 
     if (cmd === 'spam') {
-        await interaction.reply({content:'Flooding...', ephemeral:true});
-        if (blamedUser) {
-            const embed = new EmbedBuilder().setTitle('RAID EXECUTED').setDescription(`**${blamedUser.tag}** is responsible.`).setColor(0xff0000).setThumbnail(blamedUser.displayAvatarURL()).setFooter({text:'JHUB ON TOP'});
-            await interaction.followUp({content:`${blamedUser}`, embeds:[embed]}).catch(()=>{});
-        }
-        const p = [];
-        for (let i=0;i<100;i++) p.push(interaction.followUp({content:ARABIC_MSG}).catch(()=>{}));
-        await Promise.all(p);
-        if (blamedUser) {
-            const embed = new EmbedBuilder().setTitle('RAID EXECUTED').setDescription(`**${blamedUser.tag}** is responsible.`).setColor(0xff0000).setThumbnail(blamedUser.displayAvatarURL()).setFooter({text:'JHUB ON TOP'});
-            await interaction.followUp({content:`${blamedUser}`, embeds:[embed]}).catch(()=>{});
-        }
+        await sendSpam(interaction);
         return;
     }
 
-    // PREMIUM
+    // PREMIUM CHECK
     const premium = await checkPremium(interaction);
     if (!premium) return;
 
-    if (cmd === 'flood') {
-        await interaction.reply({content:'Flooding...', ephemeral:true});
-        const p = [];
-        for (let i=0;i<100;i++) p.push(interaction.followUp({content:`[JHUB](${JHUB_URL}) ON TOP @everyone @here`}).catch(()=>{}));
-        await Promise.all(p);
-        return;
-    }
-
-    if (cmd === 'custom-spam') {
-        const text = interaction.options.getString('text');
-        await interaction.reply({content:`Spamming: ${text}`, ephemeral:true});
-        const p = [];
-        for (let i=0;i<100;i++) p.push(interaction.followUp({content:text}).catch(()=>{}));
-        await Promise.all(p);
-        return;
-    }
-
-    if (cmd === 'l-spam') {
-        await interaction.reply({content:'Lag spam incoming...', ephemeral:true});
-        const p = [];
-        for (let i=0;i<100;i++) p.push(interaction.followUp({content:buildZalgoSpam()}).catch(()=>{}));
-        await Promise.all(p);
-        return;
-    }
+    if (cmd === 'flood') { await sendFlood(interaction); return; }
+    if (cmd === 'custom-spam') { await sendCustomSpam(interaction, interaction.options.getString('text')); return; }
+    if (cmd === 'l-spam') { await sendLagSpam(interaction); return; }
 });
 
 client.login(TOKEN);
