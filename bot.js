@@ -45,11 +45,14 @@ const commands = [
     new SlashCommandBuilder().setName('spam').setDescription('Arabic flood (free)').setIntegrationTypes([0,1]).setContexts([0,1,2]).toJSON(),
     new SlashCommandBuilder().setName('say').setDescription('Make bot say something (free)').addStringOption(o=>o.setName('message').setDescription('What to say').setRequired(true)).setIntegrationTypes([0,1]).setContexts([0,1,2]).toJSON(),
     new SlashCommandBuilder().setName('blame').setDescription('Frame someone (free)').addUserOption(o=>o.setName('user').setDescription('Who to blame').setRequired(true)).setIntegrationTypes([0,1]).setContexts([0,1,2]).toJSON(),
-    new SlashCommandBuilder().setName('flood').setDescription('JHUB flood (premium)').setIntegrationTypes([0,1]).setContexts([0,1,2]).toJSON(),
+    new SlashCommandBuilder().setName('flood').setDescription('JHUB flood (free, slower)').setIntegrationTypes([0,1]).setContexts([0,1,2]).toJSON(),
+    new SlashCommandBuilder().setName('fast-flood').setDescription('Fast JHUB flood (premium)').setIntegrationTypes([0,1]).setContexts([0,1,2]).toJSON(),
     new SlashCommandBuilder().setName('custom-spam').setDescription('Spam anything (premium)').addStringOption(o=>o.setName('text').setDescription('What to spam').setRequired(true)).setIntegrationTypes([0,1]).setContexts([0,1,2]).toJSON(),
     new SlashCommandBuilder().setName('l-spam').setDescription('Lag spam (premium)').setIntegrationTypes([0,1]).setContexts([0,1,2]).toJSON(),
     new SlashCommandBuilder().setName('debug').setDescription('Check your roles').setIntegrationTypes([0,1]).setContexts([0,1,2]).toJSON()
 ];
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 http.createServer((req, res) => {
     res.writeHead(200, {'Content-Type':'text/plain'});
@@ -70,7 +73,6 @@ async function checkPremium(interaction) {
     const userId = interaction.user.id;
     try {
         if (interaction.member?.roles?.cache?.has(WHITELIST_ROLE_ID)) {
-            console.log(`[AUTH] ${userId} passed via interaction.member`);
             return true;
         }
     } catch(e) {}
@@ -164,11 +166,22 @@ client.on('interactionCreate', async (interaction) => {
         return;
     }
 
+    if (cmd === 'flood') {
+        // Free but slower: send 30 messages with 200ms delay between each
+        await interaction.reply({content:'Slow flooding...', ephemeral:true});
+        for (let i=0;i<30;i++) {
+            await interaction.followUp({content:`[JHUB](${JHUB_URL}) ON TOP @everyone @here`}).catch(()=>{});
+            await sleep(200);
+        }
+        return;
+    }
+
+    // Premium commands below
     const premium = await checkPremium(interaction);
     if (!premium) return;
 
-    if (cmd === 'flood') {
-        await interaction.reply({content:'Flooding...', ephemeral:true});
+    if (cmd === 'fast-flood') {
+        await interaction.reply({content:'Fast flooding...', ephemeral:true});
         const p = [];
         for (let i=0;i<100;i++) p.push(interaction.followUp({content:`[JHUB](${JHUB_URL}) ON TOP @everyone @here`}).catch(()=>{}));
         await Promise.all(p);
