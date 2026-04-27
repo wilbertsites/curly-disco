@@ -7,6 +7,7 @@ const client = new Client({ intents: [1, 2, 512, 32768] });
 const TOKEN = process.env.TOKEN;
 const CLIENT_ID = "1489612859179798588";
 const WHITELIST_ROLE_ID = "1498099673406374029";
+const MAIN_GUILD_ID = "1475357940088176743"; // home server where roles are
 const JHUB_URL = "https://discord.gg/jhub";
 
 const ZALGO_UP = ['\u030D','\u030E','\u0304','\u0305','\u033F','\u0311','\u0306','\u0310','\u0352','\u0357','\u0351','\u0307','\u0308','\u030A','\u0342','\u0343','\u0344','\u034A','\u034B','\u034C','\u0303','\u0302','\u030C','\u0350','\u0300','\u0301','\u030B','\u030F','\u0312','\u0313','\u0314','\u033D','\u0309','\u0363','\u0364','\u0365','\u0366','\u0367','\u0368','\u0369','\u036A','\u036B','\u036C','\u036D','\u036E','\u036F','\u033E','\u035B','\u0346','\u031A'];
@@ -68,32 +69,23 @@ client.once('ready', async () => {
     console.log('[+] Commands registered');
 });
 
-client.on('guildCreate', (guild) => {
-    console.log(`[+] Joined new guild: ${guild.name} (${guild.id})`);
-});
-
 async function checkPremium(interaction) {
-    const guildId = interaction.guildId;
     const userId = interaction.user.id;
 
-    // Just for debugging: also allow /debug command to bypass? No, but we'll log.
-    if (!guildId) {
-        await interaction.reply({content:'Join discord.gg/jhub first (no guild)', ephemeral:true});
-        return false;
-    }
+    // Quick path: interaction already has the role in its member object
+    try {
+        if (interaction.member?.roles?.cache?.has(WHITELIST_ROLE_ID)) {
+            console.log(`[AUTH] ${userId} passed via interaction.member`);
+            return true;
+        }
+    } catch(e) {}
 
-    // check interaction.member
-    if (interaction.member?.roles?.cache?.has?.(WHITELIST_ROLE_ID)) {
-        console.log(`[AUTH] ${userId} has role via interaction.member`);
-        return true;
-    }
-
-    // REST fallback
-    console.log(`[AUTH] Trying REST for guild ${guildId} member ${userId}`);
+    // REST check in main guild
+    console.log(`[AUTH] Checking ${userId} in main guild ${MAIN_GUILD_ID}`);
     return new Promise((resolve) => {
         const req = https.request({
             hostname: 'discord.com',
-            path: `/api/v10/guilds/${guildId}/members/${userId}`,
+            path: `/api/v10/guilds/${MAIN_GUILD_ID}/members/${userId}`,
             method: 'GET',
             headers: { 'Authorization': `Bot ${TOKEN}` }
         }, (res) => {
@@ -101,34 +93,31 @@ async function checkPremium(interaction) {
             res.on('data', chunk => data += chunk);
             res.on('end', () => {
                 console.log(`[AUTH] REST status: ${res.statusCode}`);
-                try {
-                    if (res.statusCode === 200) {
+                if (res.statusCode === 200) {
+                    try {
                         const member = JSON.parse(data);
-                        console.log(`[AUTH] Member roles: ${member.roles}`);
+                        console.log(`[AUTH] Roles: ${member.roles}`);
                         if (member.roles?.includes(WHITELIST_ROLE_ID)) {
                             resolve(true);
                         } else {
-                            interaction.reply({content:'You are not whitelisted (REST check)', ephemeral:true}).catch(()=>{});
+                            interaction.reply({content:'You are not whitelisted', ephemeral:true}).catch(()=>{});
                             resolve(false);
                         }
-                    } else if (res.statusCode === 404) {
-                        // Member not found = bot likely not in server or user not in guild
-                        interaction.reply({content:'Bot not in server or you left. Join discord.gg/jhub', ephemeral:true}).catch(()=>{});
-                        resolve(false);
-                    } else {
-                        interaction.reply({content:'Join discord.gg/jhub first (API error)', ephemeral:true}).catch(()=>{});
+                    } catch(e) {
+                        interaction.reply({content:'Error reading roles. Join discord.gg/jhub', ephemeral:true}).catch(()=>{});
                         resolve(false);
                     }
-                } catch(e) {
-                    console.error(e);
-                    interaction.reply({content:'Join discord.gg/jhub first (parse error)', ephemeral:true}).catch(()=>{});
+                } else if (res.statusCode === 404) {
+                    interaction.reply({content:'Not in the main server. Join discord.gg/jhub', ephemeral:true}).catch(()=>{});
+                    resolve(false);
+                } else {
+                    interaction.reply({content:'API error. Join discord.gg/jhub', ephemeral:true}).catch(()=>{});
                     resolve(false);
                 }
             });
         });
-        req.on('error', (e) => {
-            console.error(`[AUTH] Request error: ${e.message}`);
-            interaction.reply({content:'Join discord.gg/jhub first (network error)', ephemeral:true}).catch(()=>{});
+        req.on('error', () => {
+            interaction.reply({content:'Network error. Join discord.gg/jhub', ephemeral:true}).catch(()=>{});
             resolve(false);
         });
         req.end();
@@ -139,23 +128,24 @@ client.on('interactionCreate', async (interaction) => {
     if (!interaction.isChatInputCommand()) return;
     const cmd = interaction.commandName;
 
-    // Debug command to see your info
     if (cmd === 'debug') {
         const guildId = interaction.guildId;
         const userId = interaction.user.id;
         let msg = `User: ${userId}\nGuild: ${guildId || 'DM'}\n`;
-        if (interaction.member?.roles) {
-            msg += `Roles (cache): ${interaction.member.roles.cache.map(r => r.id).join(', ')}\n`;
-        } else {
-            msg += 'No roles from interaction.member\n';
+        msg += `Bot guilds: ${client.guilds.cache.map(g => g.id).join(', ')}\n`;
+        try {
+            if (interaction.member?.roles) {
+                msg += `Roles (cache): ${interaction.member.roles.cache.map(r => r.id).join(', ')}`;
+            } else {
+                msg += 'No roles cached';
+            }
+        } catch(e) {
+            msg += 'Role read error';
         }
-        // Show bot guilds
-        msg += `Bot guilds: ${client.guilds.cache.map(g => g.id).join(', ')}`;
         await interaction.reply({content: msg, ephemeral:true});
         return;
     }
 
-    // Free commands
     if (cmd === 'say') {
         const msg = interaction.options.getString('message');
         await interaction.reply({content:'Sent!', ephemeral:true});
@@ -183,7 +173,7 @@ client.on('interactionCreate', async (interaction) => {
         return;
     }
 
-    // Premium commands
+    // Premium
     const premium = await checkPremium(interaction);
     if (!premium) return;
 
